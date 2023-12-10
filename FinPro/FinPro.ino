@@ -4,18 +4,16 @@
 #define BLYNK_AUTH_TOKEN "YOUR_BLINK_TOKEN"
 #define BLYNK_PRINT Serial
 
-#include <Arduino.h> // Include the Arduino library
-#include <freertos/FreeRTOS.h> // Include the FreeRTOS library
-#include <freertos/task.h> // Include the FreeRTOS task library
-#include <freertos/timers.h> // Include the FreeRTOS timer library
+#include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/timers.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <WiFiManager.h>
 #include <BlynkSimpleEsp32.h>
 #include "time.h"
 
-// Wifi ssid and password setting
-char ssid[] = "YOUR_WIFI_SSID";
-char pass[] = "YOUR_WIFI_PASSWORD";
 char auth[] = BLYNK_AUTH_TOKEN;
 
 // Setting ntp server
@@ -35,7 +33,7 @@ const int LDRPIN = 32;
 const int freq = 30000;
 const int pwmChannel = 0;
 const int resolution = 8;
-int dutyCycle = 220;
+int dutyCycle = 400;
 static int taskCoreMotor = 0;
 static int taskCoreLDR = 1;
 // Timer for 8s
@@ -70,10 +68,32 @@ BLYNK_WRITE(V0);
 // Setup the pin and the others 
 void setup()
 {
+  // Initialize the serial monitor heartrate
   Serial.begin(115200);
 
-  // Initialize connect to blynk
-  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  // WiFiManager
+  WiFiManager wm;
+  
+  // Reset WiFi settings for testing
+  wm.resetSettings();
+
+  // Set up WiFiManager
+  bool res = wm.autoConnect("Smart Curtain", "12345678");
+
+  if(!res) {
+      Serial.println("Failed to connect and hit timeout");
+      delay(3000);
+      // Reset and try again, or maybe put it to deep sleep
+      ESP.restart();
+  } 
+  else {
+      // Connected to WiFi
+      Serial.println("Connected to WiFi");
+      
+      // Initialize connect to Blynk
+      Blynk.config(auth);
+  }
+
   // testing
   Serial.println("Testing DC Motor...");
   active = true;
@@ -112,6 +132,8 @@ void setup()
       &ldrTaskHandle,   /* Task handle. */
       taskCoreLDR);     /* Core where the task should run */
 
+  Blynk.virtualWrite(V0, curtainStatus == "Closed" ? 0 : 1);    // Set into the blynk app
+  Blynk.virtualWrite(V3, application ? 1 : 0);    // Set into the blynk app
 }
 
 // Motor task
